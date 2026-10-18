@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {makeBackup,readBackup} from '../public/editor/backup.js';
+import {move,reorder,segments,total} from '../public/editor/timeline.js';
+const image=()=>({id:'i',name:'Photo',type:'image',seconds:5,blob:new Blob(['photo']),thumb:new Blob(['thumb'])});
+const project=()=>({project:{id:'p',name:'Test',cards:false,items:[image()]},brand:{name:'Business',color:'#a84d34'}});
+test('backup refuses duplicate media identities',async()=>{const d=project();d.project.items.push(image());await assert.rejects(()=>makeBackup(d));});
+test('backup refuses invalid photo timing',async()=>{for(const value of [-1,Infinity,NaN,'5',0]){const d=project();d.project.items[0].seconds=value;await assert.rejects(()=>makeBackup(d));}});
+test('backup refuses unusable media thumbnails',async()=>{const d=project();delete d.project.items[0].thumb;await assert.rejects(()=>makeBackup(d));});
+test('backup refuses a malformed narration take',async()=>{const d=project();d.project.voice={version:2,takes:[{key:'i',blob:'not audio',duration:5,offset:0,stamp:'image:5.000'}]};await assert.rejects(()=>makeBackup(d));});
+test('backup refuses reversed video trims',async()=>{const d=project();Object.assign(d.project.items[0],{type:'video',in:8,out:2,originalDuration:10});await assert.rejects(()=>makeBackup(d));});
+test('backup rejects malformed brand values used by rendering',async()=>{for(const brand of [{name:5},{color:'not-a-color'},{logo:{fake:true}}]){const d=project();d.brand=brand;await assert.rejects(()=>makeBackup(d));}});
+test('large backup round trip preserves 1000 independently ordered photos',async()=>{const d=project();d.project.items=Array.from({length:1000},(_,i)=>({...image(),id:'i'+i}));const copy=await readBackup(await makeBackup(d));assert.equal(copy.project.items.length,1000);assert.equal(copy.project.items[999].id,'i999');assert.equal(await copy.project.items[500].blob.text(),'photo');});
+test('5000 deterministic edits preserve every media identity and timeline duration',()=>{let items=Array.from({length:200},(_,i)=>({...image(),id:'i'+i}));let seed=345;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed;};for(let i=0;i<5000;i++){const a=random()%200,b=random()%200;items=i%2?reorder(items,'i'+a,'i'+b):move(items,'i'+a,(random()%21)-10);assert.equal(new Set(items.map(x=>x.id)).size,200);}const p={items,cards:true};assert.equal(total(p),1004);const s=segments(p);for(let i=1;i<s.length;i++)assert.equal(s[i].start,s[i-1].end);});

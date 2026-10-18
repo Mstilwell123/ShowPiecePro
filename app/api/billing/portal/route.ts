@@ -1,0 +1,2 @@
+import {account,sameOrigin,json,failure,stripe} from '../../../../lib/server';
+export async function POST(req:Request){try{sameOrigin(req);const a=await account();if(!a.customer)return json({error:'No subscription to manage.'},400);const s=await stripe('billing_portal/sessions',new URLSearchParams({customer:a.customer,return_url:new URL(req.url).origin+'/studio'}));return json({url:s.url});}catch(e){return failure(e);}}

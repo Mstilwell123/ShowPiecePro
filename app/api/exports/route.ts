@@ -1,0 +1,2 @@
+import {env} from 'cloudflare:workers';import {account,sameOrigin,json,failure,runtime} from '../../../lib/server';import {reserve,monthlyLimit} from '../../../lib/quota.mjs';
+export async function POST(req:Request){try{sameOrigin(req);const a=await account(),job=await reserve(env.DB,a,Date.now(),monthlyLimit(runtime().MONTHLY_EXPORT_LIMIT));return job?json(job,201):json({error:'Your video allowance has been used. Choose the $30/month plan to make more videos.',upgrade:true},402);}catch(e){return failure(e);}}

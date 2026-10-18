@@ -1,0 +1,15 @@
+import {env} from 'cloudflare:workers';
+import {getChatGPTUser} from '../app/chatgpt-auth';
+export const runtime=()=>env as typeof env&{STRIPE_SECRET_KEY?:string;STRIPE_WEBHOOK_SECRET?:string;MONTHLY_EXPORT_LIMIT?:string;BILLING_ENABLED?:string;ADMIN_EMAIL?:string};
+export function json(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}});}
+export async function account(){const user=await getChatGPTUser();if(!user)throw new Error('AUTH_REQUIRED');const db=env.DB;if(!db)throw new Error('SERVICE_UNAVAILABLE');await db.prepare('INSERT INTO accounts (id,email,created) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email').bind(user.userId,user.email,Date.now()).run();const a=await db.prepare('SELECT * FROM accounts WHERE id=?').bind(user.userId).first<any>();const owner=runtime().ADMIN_EMAIL?.trim().toLowerCase();a.role=owner&&user.email?.trim().toLowerCase()===owner?'administrator':'customer';return a;}
+export function sameOrigin(req:Request){if(req.headers.get('Origin')!==new URL(req.url).origin)throw new Error('ORIGIN_REJECTED');}
+export async function limitedBody(req:Request,limit:number){const reader=req.body?.getReader();if(!reader)return '';const chunks:Uint8Array[]=[];let count=0;while(true){const {done,value}=await reader.read();if(done)break;count+=value.byteLength;if(count>limit){await reader.cancel();throw new Error('BODY_TOO_LARGE');}chunks.push(value);}const bytes=new Uint8Array(count);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return new TextDecoder().decode(bytes);}
+export function failure(e:unknown){const message=e instanceof Error?e.message:'';return message==='AUTH_REQUIRED'?json({error:'Sign in to continue.'},401):message==='ORIGIN_REJECTED'?json({error:'Request not allowed.'},403):json({error:'This action could not finish. Your project remains on this device. Please try again.'},503);}
+export async function stripe(path:string,params?:URLSearchParams,idempotency?:string){const key=runtime().STRIPE_SECRET_KEY;if(!key)throw new Error('BILLING_NOT_CONFIGURED');const r=await fetch('https://api.stripe.com/v1/'+path,{method:params?'POST':'GET',headers:{Authorization:'Bearer '+key,'Stripe-Version':'2024-06-20',...(params?{'Content-Type':'application/x-www-form-urlencoded'}:{}),...(idempotency?{'Idempotency-Key':idempotency}:{})},body:params?.toString()});if(!r.ok)throw new Error('PAYMENT_PROVIDER_ERROR');return await r.json() as any;}
+export async function syncSubscription(id:string){
+ const s=await stripe('subscriptions/'+encodeURIComponent(id));const owner=s.metadata?.showpiece_user;
+ if(!owner)return;const plan=s.items?.data?.[0]?.price;
+ if(s.items.data.length!==1||plan?.unit_amount!==3000||plan?.currency!=='usd'||plan?.recurring?.interval!=='month'||plan?.recurring?.interval_count!==1)throw new Error('INVALID_PLAN');
+ await env.DB!.prepare('UPDATE accounts SET customer=?,subscription=?,status=?,period_start=?,period_end=? WHERE id=?').bind(typeof s.customer==='string'?s.customer:s.customer.id,s.id,s.status,s.current_period_start*1000,s.current_period_end*1000,owner).run();
+}

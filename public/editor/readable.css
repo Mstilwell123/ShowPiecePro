@@ -1,0 +1,30 @@
+/* Readable defaults across desktop and mobile, including browser zoom. */
+body{font-size:18px;line-height:1.55;--muted:#655747}
+#recordDialog{width:680px;max-height:calc(100dvh - 32px);overflow-y:auto;inset:16px 16px auto auto;padding:20px}
+#recordDialog p,#recordDialog .helper{font-size:16px;line-height:1.5}
+#recordDialog .button{font-size:18px;min-height:48px}
+.recording-preview canvas{width:100%;height:auto;aspect-ratio:16/9;display:block;border-radius:10px;background:#302821;max-height:38dvh;object-fit:contain}
+#recordingSlide{margin:8px 0;font-weight:600;overflow-wrap:anywhere}
+#recordDialog .record-timer{font-size:28px;margin:8px 0}
+#recordDialog .record-actions{position:sticky;bottom:-20px;background:#fffaf2;padding:12px 0}
+@media(max-width:600px){#recordDialog{inset:8px;width:calc(100% - 16px);max-width:none;max-height:calc(100dvh - 16px);padding:14px}#recordDialog .dialog-heading h2{font-size:22px}.recording-preview canvas{max-height:28dvh}#recordDialog .record-actions{bottom:-14px}}
+.workspace-label,.eyebrow,.sidebar-note small{font-size:14px;letter-spacing:1px;color:#66533e}
+.sidebar-note,.sidebar-note p,.steps,.badge,.saved,.player,.resolution,.notice,.text-button,.toggle,.field,.helper,.below,.meter-label,.voice-review,.voice-progress,.mic-alert{font-size:16px;line-height:1.6}
+.helper,.notice,.below,.saved,.steps,.sidebar-note p{color:#655747}
+.toggle small,.empty-preview small,.export-bar span,.timeline-header span{font-size:16px;line-height:1.6}
+.button,.record-actions .button,.section-voice-button{font-size:18px;min-height:48px;white-space:normal;line-height:1.4}
+input,textarea,select{font-size:18px;min-height:46px;max-width:100%}
+.play,.icon-button{min-height:48px;min-width:48px;font-size:22px}
+.steps{flex-wrap:wrap}.steps b{font-size:16px;min-width:32px;height:32px}
+.controls{min-width:0}.editor-grid{grid-template-columns:minmax(0,1fr) 340px}
+.timeline-header,.project-heading,.export-bar,.backup-tools{flex-wrap:wrap;gap:16px}
+.tile{flex-basis:190px}.tile-name{font-size:16px;max-width:190px}.number,.kind,.tile-recorded{font-size:14px}.timeline-add{font-size:16px;flex-basis:170px}.tile input{min-width:55px}.section-voice-button{font-size:16px}
+.backup-tools .button{margin:8px 8px 8px 0}.projects-list .helper{max-width:none;text-align:left;font-size:16px}
+@media(max-width:1100px){.editor-grid{grid-template-columns:minmax(0,1fr)}.controls{border-left:0;padding-left:0}.helper{max-width:none;text-align:left}}
+@media(max-width:600px){main{padding:24px 16px}.editor{padding:16px}.intro{font-size:20px}.project-heading{align-items:flex-start}.project-heading input{font-size:26px}.badge{font-size:14px}.sidebar .nav{min-width:48px;min-height:48px}.below{flex-direction:column}.player{gap:8px;flex-wrap:wrap}.player input{flex:1;min-width:100px}.resolution{font-size:14px}.steps{gap:12px}.steps span{font-size:16px}.button{font-size:18px;min-height:48px}.eyebrow{font-size:14px}}
+
+.play{font-size:18px;white-space:nowrap;padding:10px 14px;border:1px solid #c3a785;border-radius:8px;background:#fffaf2}.player{flex-wrap:wrap}#saveThumbnail{margin:8px 0}
+
+.project-timestamp{display:block;font-size:16px;line-height:1.6;margin-top:6px;color:#655747;white-space:normal}.open-project{white-space:normal;text-align:left}
+
+.latest-video{display:inline-block;background:#e1ead8;color:#344629;border-radius:6px;padding:2px 8px;font-size:16px}

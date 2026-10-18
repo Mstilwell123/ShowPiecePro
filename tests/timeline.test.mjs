@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {segments,total,atTime,move,reorder} from '../public/editor/timeline.js';
+const items=[{id:'a',type:'image',seconds:3},{id:'b',type:'video',in:2,out:7},{id:'c',type:'image',seconds:4}];
+test('mixed media has a continuous timeline and respects clip trims',()=>{const p={items,cards:true};assert.equal(total(p),16);assert.deepEqual(segments(p).map(s=>[s.start,s.end]),[[0,2],[2,5],[5,10],[10,14],[14,16]]);assert.equal(atTime(p,5).item.id,'b');assert.equal(atTime(p,15).kind,'end');});
+test('reorder keeps every item exactly once and allows both directions',()=>{assert.deepEqual(reorder(items,'a','c').map(x=>x.id),['b','a','c']);assert.deepEqual(reorder(items,'c','a').map(x=>x.id),['c','a','b']);assert.deepEqual(move(items,'b',1).map(x=>x.id),['a','c','b']);assert.deepEqual(move(items,'a',-1),items);assert.equal(items[0].id,'a');});

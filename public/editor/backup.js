@@ -1,0 +1,29 @@
+const MAGIC='SHOWPIECE1\n', MAX=512*1024*1024, MANIFEST_MAX=2*1024*1024;
+const bad=()=>Error('This is not a valid ShowPiece project backup.');
+function validate(data){
+ if(!data||typeof data!=='object'||!data.project||!Array.isArray(data.project.items)||data.project.items.length>2000||typeof data.project.name!=='string'||!data.brand||typeof data.brand!=='object')throw bad();
+ const finite=(v,min=0)=>typeof v==='number'&&Number.isFinite(v)&&v>=min;
+ function brand(b){if(!b||Array.isArray(b)||typeof b!=='object')throw bad();for(const k of ['name','website','phone','cta'])if(b[k]!==undefined&&(typeof b[k]!=='string'||b[k].length>10000))throw bad();if(b.color!==undefined&&(typeof b.color!=='string'||!/^#[0-9a-f]{6}$/i.test(b.color)))throw bad();if(b.logo!=null&&!(b.logo instanceof Blob))throw bad();}
+ brand(data.brand);if(data.project.backupBrand)brand(data.project.backupBrand);
+ function items(list){if(!Array.isArray(list)||list.length>2000)throw bad();const ids=new Set();for(const item of list){if(!item||typeof item.id!=='string'||!item.id||ids.has(item.id)||!['image','video'].includes(item.type)||!(item.blob instanceof Blob)||!(item.thumb instanceof Blob)||typeof item.name!=='string')throw bad();ids.add(item.id);if(item.type==='image'&&!finite(item.seconds,.1))throw bad();if(item.type==='video'&&(!finite(item.in)||!finite(item.out,.1)||!finite(item.originalDuration,.1)||item.out<=item.in||item.out>item.originalDuration+.1))throw bad();}}
+ if(data.project.openingCover!=null&&(!(data.project.openingCover instanceof Blob)||data.project.openingCover.type!=='image/jpeg'||data.project.openingCover.size>10*1024*1024))throw bad();
+ if(data.project.thumbnailPosition&&(!finite(data.project.thumbnailPosition.x)||data.project.thumbnailPosition.x>1||!finite(data.project.thumbnailPosition.y)||data.project.thumbnailPosition.y>1))throw bad();
+ if(data.project.thumbnailSize!=null&&!['small','medium','large'].includes(data.project.thumbnailSize))throw bad();
+ items(data.project.items);if(data.project.timelineUndo){items(data.project.timelineUndo.items);if(typeof data.project.timelineUndo.cards!=='boolean'||!finite(data.project.timelineUndo.pace,.1))throw bad();}
+ for(const k of ['area','details','thumbnailText'])if(data.project[k]!==undefined&&typeof data.project[k]!=='string')throw bad();
+ if(data.project.seo){for(const k of ['title','description','summary','keywords'])if(data.project.seo[k]!==undefined&&typeof data.project.seo[k]!=='string')throw bad();}
+ if(data.project.cards!=null&&typeof data.project.cards!=='boolean')throw bad();
+ if(data.project.clipVolume!=null&&(!finite(data.project.clipVolume)||data.project.clipVolume>100))throw bad();
+ const voice=data.project.voice;if(voice){if(voice.version===2){if(!Array.isArray(voice.takes)||voice.takes.length>10000)throw bad();const keys=new Set();for(const take of voice.takes){if(!take||typeof take.key!=='string'||keys.has(take.key)||!(take.blob instanceof Blob)||!finite(take.duration,.001)||!finite(take.offset)||typeof take.stamp!=='string')throw bad();keys.add(take.key);}}else if(!(voice.blob instanceof Blob)||!finite(voice.duration,.001))throw bad();}
+ return data;
+}
+export async function makeBackup(data){
+ validate(data);const blobs=[],sizes=[];
+ function pack(value,depth=0){if(depth>40)throw bad();if(value instanceof Blob){const id=blobs.length;blobs.push(value);sizes.push({size:value.size,type:value.type});return {$showpieceBlob:id};}if(Array.isArray(value))return value.map(x=>pack(x,depth+1));if(value&&typeof value==='object'){const out=Object.create(null);for(const [key,v]of Object.entries(value)){if(['__proto__','constructor','prototype'].includes(key))throw bad();out[key]=pack(v,depth+1);}return out;}return value;}
+ const packed=pack(data),manifest=new TextEncoder().encode(JSON.stringify({format:1,data:packed,blobs:sizes}));if(manifest.length>MANIFEST_MAX)throw Error('This project has too much backup information.');const size=new Uint8Array(4);new DataView(size.buffer).setUint32(0,manifest.length);const file=new Blob([MAGIC,size,manifest,...blobs],{type:'application/octet-stream'});if(file.size>MAX)throw Error('Project backup exceeds 512 MB. Back up a smaller project.');return file;
+}
+export async function readBackup(file){
+ if(file.size>MAX||file.size<MAGIC.length+4)throw bad();const header=new Uint8Array(await file.slice(0,MAGIC.length+4).arrayBuffer());if(new TextDecoder().decode(header.slice(0,MAGIC.length))!==MAGIC)throw bad();const length=new DataView(header.buffer).getUint32(MAGIC.length);if(length>MANIFEST_MAX||length<2)throw bad();let offset=MAGIC.length+4+length;if(offset>file.size)throw bad();let manifest;try{manifest=JSON.parse(await file.slice(MAGIC.length+4,offset).text());}catch{throw bad();}if(manifest.format!==1||!Array.isArray(manifest.blobs)||manifest.blobs.length>10000)throw bad();const blobs=[];for(const entry of manifest.blobs){if(!entry||!Number.isSafeInteger(entry.size)||entry.size<0||typeof entry.type!=='string'||entry.type.length>200||offset+entry.size>file.size)throw bad();blobs.push(file.slice(offset,offset+entry.size,entry.type));offset+=entry.size;}if(offset!==file.size)throw bad();
+ function unpack(value,depth=0){if(depth>40)throw bad();if(Array.isArray(value))return value.map(x=>unpack(x,depth+1));if(value&&typeof value==='object'){if(Object.hasOwn(value,'$showpieceBlob')){if(Object.keys(value).length!==1||!Number.isInteger(value.$showpieceBlob)||!blobs[value.$showpieceBlob])throw bad();return blobs[value.$showpieceBlob];}const out=Object.create(null);for(const [key,v]of Object.entries(value)){if(['__proto__','constructor','prototype'].includes(key))throw bad();out[key]=unpack(v,depth+1);}return out;}return value;}
+ const data=validate(unpack(manifest.data));data.brand={name:'',website:'',phone:'',cta:'Request a free estimate',color:'#B85C40',logo:null,...data.brand};data.project={cards:true,pace:5,area:'',details:'',seo:null,voice:null,...data.project};return data;
+}
